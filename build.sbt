@@ -34,11 +34,10 @@ lazy val treap = Project(
     testFrameworks in Benchmark := Seq(new TestFramework("org.scalameter.ScalaMeterFramework")),
     logBuffered := false,
     parallelExecution in Test := false,
-    parallelExecution in Benchmark := false
-    // initialCommands := """
-    //   import com.ami.util._
-    //   import com.ami.util.collection.immutable._
-    // """,
+    parallelExecution in Benchmark := false,
+    initialCommands := """
+      import treaps._
+    """
   )
 ) configs(
   Benchmark
