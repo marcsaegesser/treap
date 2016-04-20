@@ -11,9 +11,11 @@ sealed trait Treap[+K,+V] {
   def remove[KK >: K](x: KK)(implicit o: Ordering[KK]): Treap[KK,V]
   def find[KK >: K](x: KK)(implicit o: Ordering[KK]): Option[V]
 
+  def isEmpty: Boolean
+
   def foldLeft[A](z: A)(f: (A, Treap[K,V]) => A): A
 
-  def toList: List[(K, V)]
+  def toList: List[(K, V/*, PriorityGenerator.Priority*/)]
 
   // private[treaps]
   def add[KK >: K,VV >: V](k: KK, v: VV, p: PriorityGenerator.Priority)(implicit o: Ordering[KK]): Treap[KK,VV]
@@ -23,6 +25,8 @@ sealed trait Treap[+K,+V] {
   def rotateLeft[KK >: K,VV >: V](implicit o: Ordering[KK]): Treap[KK,VV]
   // private[treaps]
   def rotateRight[KK >: K,VV >: V](implicit o: Ordering[KK]): Treap[KK,VV]
+  // private[treaps]
+  def cleanup[KK >: K,VV >: V]: Treap[KK,VV]
 }
 
 trait PriorityGenerator {
@@ -56,15 +60,18 @@ trait TreapImpls {
     def v: Nothing = throw new NoSuchElementException("EmptyTreap has no value")
     private[treaps] def p: Priority = throw new NoSuchElementException("EmptyTreap has no priority")
 
-    def remove[KK >: Nothing](x: KK)(implicit o: Ordering[KK]): Treap[KK,Nothing] = throw new NoSuchElementException("remove on empty Treap")
+    def remove[KK >: Nothing](x: KK)(implicit o: Ordering[KK]): Treap[KK,Nothing] = EmptyTreap
 
     def find[KK >: Nothing](x: KK)(implicit o: Ordering[KK]): Option[Nothing] = None
+
+    def isEmpty: Boolean = true
 
     def foldLeft[A](z: A)(f: (A, Treap[Nothing,Nothing]) => A): A = z
 
     def toList = List()
 
-    /*private[treaps]*/ def add[K,V](k: K, v: V, p: Priority)(implicit o: Ordering[K]): Treap[K,V] =
+    // private[treaps]
+    def add[K,V](k: K, v: V, p: Priority)(implicit o: Ordering[K]): Treap[K,V] =
       Leaf[K,V](k, v, p)
 
     // private[treaps]
@@ -73,6 +80,8 @@ trait TreapImpls {
     def rotateLeft[KK,VV](implicit o: Ordering[KK]): Treap[Nothing, Nothing] = EmptyTreap
     // private[treaps]
     def rotateRight[KK,VV](implicit o: Ordering[KK]): Treap[Nothing, Nothing] = EmptyTreap
+    // private[treaps]
+    def cleanup[KK,VV]: Treap[KK,VV] = EmptyTreap
   }
 
   import CompareHelper._
@@ -85,10 +94,12 @@ trait TreapImpls {
     def find[KK >: K](kk: KK)(implicit o: Ordering[KK]): Option[V] =
       Option(v) filter (_ => o.equiv(kk, k))
 
+    def isEmpty: Boolean = false
+
     def foldLeft[A](z: A)(f: (A, Treap[K,V]) => A): A =
       f(z, this)
 
-    def toList = List((k, v))
+    def toList = List((k, v/*, p*/))
 
     // private[treaps]
     def add[KK >: K,VV >: V](kk: KK, vv: VV, pp: Priority)(implicit o: Ordering[KK]): Treap[KK,VV] =
@@ -102,27 +113,31 @@ trait TreapImpls {
     // private[treaps]
     def reheap[KK >: K,VV >: V]()(implicit o: Ordering[KK]): Treap[KK,VV] = this
     // private[treaps]
-    def rotateLeft[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = this
+    def rotateLeft[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = throw new Exception("Cannot perform rotateLeft on a Leaf node")
     // private[treaps]
-    def rotateRight[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = this
+    def rotateRight[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = throw new Exception("Cannot perform rotateRight on a Leaf node")
+    // private[treaps]
+    def cleanup[KK >: K,VV >: V]: Treap[KK,VV] = this
   }
 
   case class LeftNode[K,V](k: K, v: V, p: Priority, l: Treap[K,V]) extends Treap[K,V] {
 
     def remove[KK >: K](kk: KK)(implicit o: Ordering[KK]): Treap[KK,V] =
       o.comp(kk, k) fold (
-        l.remove(kk),
-        ???,
+        LeftNode(k, v, p, l.remove(kk)).cleanup,
+        l,
         this
       )
 
     def find[KK >: K](kk: KK)(implicit o: Ordering[KK]): Option[V] =
       o.comp(kk, k) fold (l.find(kk), Option(v), None)
 
+    def isEmpty: Boolean = false
+
     def foldLeft[A](z: A)(f: (A, Treap[K,V]) => A): A =
       f(l.foldLeft(z)(f), this)
 
-    def toList = l.toList ++ List((k, v))
+    def toList = l.toList ++ List((k, v/*, p*/))
 
     // private[treaps]
     def add[KK >: K,VV >: V](kk: KK, vv: VV, pp: Priority)(implicit o: Ordering[KK]): Treap[KK,VV] =
@@ -132,12 +147,12 @@ trait TreapImpls {
         Node(k, v, p, l, Leaf(kk, vv, pp)).reheap
       )
 
-
     // private[treaps]
     def reheap[KK >: K,VV >: V]()(implicit o: Ordering[KK]): Treap[KK,VV] =
       (p comp l.p) fold (rotateRight(o), this, this)
+
     // private[treaps]
-    def rotateLeft[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = this
+    def rotateLeft[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = throw new Exception("Cannot perform rotateLeft on a Left node")
 
     // private[treaps]
     def rotateRight[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] =
@@ -146,20 +161,32 @@ trait TreapImpls {
         case LeftNode(lk, lv, lp, ll)  => Node(lk, lv, lp, ll, Leaf(k, v, p))
         case RightNode(lk, lv, lp, lr) => RightNode(lk, lv, lp, LeftNode(k, v, p, lr))
         case Node(lk, lv, lp, ll, lr)  => Node(lk, lv, lp, ll, LeftNode(k, v, p, lr))
-        case _                         => ???
+        case _                         => throw new IllegalStateException("Treap contains EmptyTreap")
       }
+
+    // private[treaps]
+    def cleanup[KK >: K,VV >: V]: Treap[KK,VV] = if(l.isEmpty) Leaf(k, v, p) else this
+
   }
 
   case class RightNode[K,V](k: K, v: V, p: Priority, r: Treap[K,V]) extends Treap[K,V] {
 
-    def remove[KK >: K](kk: KK)(implicit o: Ordering[KK]): Treap[KK,V] = ???
+    def remove[KK >: K](kk: KK)(implicit o: Ordering[KK]): Treap[KK,V] =
+      o.comp(kk, k) fold (
+        this,
+        r,
+        RightNode(k, v, p, r.remove(kk)).cleanup
+      )
+
     def find[KK >: K](kk: KK)(implicit o: Ordering[KK]): Option[V] =
       o.comp(kk, k) fold (None, Option(v), r.find(kk))
+
+    def isEmpty: Boolean = false
 
     def foldLeft[A](z: A)(f: (A, Treap[K,V]) => A): A =
       r.foldLeft(f(z, this))(f)
 
-    def toList = List((k, v)) ++ r.toList
+    def toList = List((k, v/*, p*/)) ++ r.toList
 
     // private[treaps]
     def add[KK >: K,VV >: V](kk: KK, vv: VV, pp: Priority)(implicit o: Ordering[KK]): Treap[KK,VV] =
@@ -181,24 +208,34 @@ trait TreapImpls {
         case LeftNode(rk, rv, rp, rl)  => LeftNode(rk, rv, rp, RightNode(k, v, p, rl))
         case RightNode(rk, rv, rp, rr) => Node(rk, rv, rp, Leaf(k, v, p), rr)
         case Node(rk, rv, rp, rl, rr)  => Node(rk, rv, rp, RightNode(k, v, p, rl), rr)
-        case _ => ???
+        case _                         => throw new IllegalStateException("Treap contains EmptyTreap")
       }
 
     // private[treaps]
-    def rotateRight[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = this
+    def rotateRight[KK >: K,VV >: V](implicit o: Ordering[KK]): treaps.Treap[KK,VV] = throw new Exception("Cannot perform rotateRight on a Right node")
+
+    // private[treaps]
+    def cleanup[KK >: K,VV >: V]: Treap[KK,VV] = if(r.isEmpty) Leaf(k, v, p) else this
   }
 
   case class Node[K,V](k: K, v: V, p: Priority, l: Treap[K,V], r: Treap[K,V]) extends Treap[K,V] {
 
-    def remove[KK >: K](kk: KK)(implicit o: Ordering[KK]): Treap[KK,V] = ???
+    def remove[KK >: K](kk: KK)(implicit o: Ordering[KK]): Treap[KK,V] =
+      o.comp(kk, k) fold (
+        Node(k, v, p, l.remove(kk), r).cleanup,
+        ((l.p comp r.p) fold (rotateLeft(o), rotateRight(o), rotateRight(o)) remove(kk)).cleanup,
+        Node(k, v, p, l, r.remove(kk)).cleanup
+      )
 
     def find[KK >: K](kk: KK)(implicit o: Ordering[KK]): Option[V] =
       o.comp(kk, k) fold (l.find(kk), Option(v), r.find(kk))
 
+    def isEmpty: Boolean = false
+
     def foldLeft[A](z: A)(f: (A, Treap[K,V]) => A): A =
       r.foldLeft(f(l.foldLeft(z)(f), this))(f)
 
-    def toList = l.toList ++ List((k, v)) ++ r.toList
+    def toList = l.toList ++ List((k, v/*, p*/)) ++ r.toList
 
     // private[treaps]
     def add[KK >: K,VV >: V](kk: KK, vv: VV, pp: Priority)(implicit o: Ordering[KK]): Treap[KK,VV] =
@@ -234,6 +271,14 @@ trait TreapImpls {
         case RightNode(lk, lv, lp, lr) => RightNode[KK,VV](lk, lv, lp, Node(k, v, p, lr, r))
         case Node(lk, lv, lp, ll, lr)  => Node(lk, lv, lp, ll, Node(k, v, p, lr, r))
         case _                         => throw new IllegalStateException("Treap contains EmptyTreap")
+      }
+
+    // private[treaps]
+    def cleanup[KK >: K,VV >: V]: Treap[KK,VV] =
+      this match {
+        case Node(k, v, p, EmptyTreap, r) => RightNode(k, v, p, r)
+        case Node(k, v, p, l, EmptyTreap) => LeftNode(k, v, p, l)
+        case Node(_, _, _, _, _)          => this
       }
   }
 }

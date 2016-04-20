@@ -79,4 +79,10 @@ object BSTProperties extends Properties("Binary Search Tree") {
     t.foldLeft(StringBuilder.newBuilder)((a, t) => a.append(t.v)) ==
     deDup(l).sortBy(_._1).foldLeft(StringBuilder.newBuilder)((a, t) => a.append(t._2))
   }
+
+  property("remove") = forAll { l: List[KVP] =>
+    val t = Treap(l:_*)
+    val result = l.foldLeft(t)((a, k) => a.remove(k._1))
+    result.isEmpty
+  }
 }
