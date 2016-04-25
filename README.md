@@ -128,7 +128,7 @@ implementation.
 This chart show the results. The logarithmic performance profile is
 apparent for both insertions and searches.
 
-![Treap performance](http://raw.githubusercontent.com/marcsaegesser/treap/master/charts/PerfChart.png)
+![Treap performance](charts/PerfChart.png)
 
 The blue lines show the results of insertions. For each test a random
 Treap of some size was generated (using Integer keys and values) and
