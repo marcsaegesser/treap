@@ -93,10 +93,10 @@ object TreapProperties extends Properties("Treap") {
   }
 
   property("fold") = forAll { l: List[KVP] =>
-    def helper[K,V](l: Treap[K,V], k: K, v: V, r: Treap[K,V]): List[K] =
-      l.fold(List.empty[K])(helper) ++ List(k) ++ r.fold(List.empty[K])(helper)
+    def helper[K,V](l: Treap[K,V], k: K, v: V, r: Treap[K,V]): List[(K,V)] =
+      l.fold(List.empty[(K,V)])(helper) ++ List((k,v)) ++ r.fold(List.empty[(K,V)])(helper)
     val t = Treap(l:_*)
-    val result = t.fold(List.empty[Int])(helper)
+    val result = t.fold(List.empty[(Int,String)])(helper)
     val sorted = deDup(l).sortBy(_._1)
     sorted == result
   }
